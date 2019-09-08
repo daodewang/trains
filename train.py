@@ -18,11 +18,12 @@ def download_tnumber_datas(tn_datas_url):
                     tfile.write(chunk)
 
 
+###下载需要的文件
 #tn_datas_url='https://kyfw.12306.cn/otn/resources/js/query/train_list.js?scriptVersion=1.0'
 #download_tnumber_datas(tn_datas_url)
 
-station_datas_url='https://kyfw.12306.cn/otn/resources/js/framework/station_name.js?station_version=1.9002'
-download_tnumber_datas(station_datas_url)
+#station_datas_url='https://kyfw.12306.cn/otn/resources/js/framework/station_name.js?station_version=1.9002'
+#download_tnumber_datas(station_datas_url)
 
 
 #分析train_list.txt文件 得出火车 出发站到终点站的数据
@@ -76,3 +77,63 @@ def getTrainNoList(back_date, train_date, from_station, from_station_name, to_st
             'getTrainNoList error 获取车次列表错误 日期' + train_date + '从' + from_station_name + '到' + to_station_name + ' :%s',
             err)
         return None, None
+
+
+#trainListStartToEnd()
+
+
+# 提取动车、高铁信息
+
+
+'''
+with open('train_list.txt','r', encoding='utf-8') as f:
+
+    strJson = json.load(f)
+
+    onedayD = strJson["2019-07-16"]['D']
+    with open('Dtrain.txt', 'w', encoding='utf-8') as ff:
+        json.dump(onedayD,ff)
+
+    onedayG = strJson["2019-07-16"]['G']
+    with open('Gtrain.txt', 'w', encoding='utf-8') as ff:
+        json.dump(onedayG, ff)
+
+    with open('Dtrain.txt', 'w', encoding='utf-8') as f2:
+        json.dump(onedayD,f2)
+
+    listD = [e['station_train_code'] for e in onedayD]
+    listG = [e['station_train_code'] for e in onedayG]
+    print(len(onedayD))
+    print(listD)
+    print(len(onedayG))
+    print(listG)
+'''
+
+
+# 精简信息，只有车次
+'''
+with open('Dtrain.txt', 'r', encoding='utf-8') as f:
+    patten = r'\(.*?\)'
+    data = f.read()
+    newdata = re.sub(patten, '', data)
+
+    with open('Dshorter_list.txt', 'w', encoding='utf-8') as f2:
+        f2.write(newdata)
+
+
+'''
+#获取车次列表
+
+f = open('Dshorter_list.txt', 'r', encoding='utf-8')
+strJson = json.load(f)
+listD = [e['station_train_code'] for e in strJson]
+print(len(listD),listD)
+f.close()
+
+f = open('Gshorter_list.txt', 'r', encoding='utf-8')
+strJson = json.load(f)
+listG = [e['station_train_code'] for e in strJson]
+print(len(listG),listG)
+f.close()
+
+baseurl = 'https://trains.ctrip.com/trainbooking/TrainSchedule/G1/?&mkt_header=bdkx&ouid=56474440-alading_cc-'
