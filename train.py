@@ -2,6 +2,7 @@ import re
 import json
 import requests
 from bs4 import BeautifulSoup
+import collections
 
 
 # 下载所有的车次数据 | 保存为 tnumber_datas.txt 文件
@@ -137,20 +138,36 @@ f.close()
 
 baseurl = 'https://trains.ctrip.com/trainbooking/TrainSchedule/'
 
-try:
-    trainNo = 'G1'
-    r = requests.get(baseurl+trainNo)
-    r.raise_for_status()
-    r.encoding = "utf-8"
+StopClass = collections.namedtuple('StopClass', ['name', 'stop', 'start'])
+TrainClass = collections.namedtuple('TrainClass', ['train', 'stops'])
 
-    soup = BeautifulSoup(r.text, 'html.parser')
-    target_regexp = re.compile(r'ctl00\_MainContentPlaceHolder\_rptStopOverStation.*')
-    tt = soup.find_all(id=target_regexp)
-    i = 1
-    for e in tt:
-        print(e.parent.parent)
-        print(i)
-        i = i+1
 
-except Exception as e:
-    print(e)
+def getTrainInfo(trainNo='G1'):
+    try:
+        r = requests.get(baseurl+trainNo)
+        r.raise_for_status()
+        r.encoding = "gb2312"
+
+        soup = BeautifulSoup(r.text.replace("\n", ""), 'html.parser')
+        target_regexp = re.compile(r'ctl00\_MainContentPlaceHolder\_rptStopOverStation.*')
+        tt = soup.find_all(id=target_regexp)
+        stops = []
+        for e in tt:
+            stop = e.parent.next_sibling.next_sibling
+            start = stop.next_sibling.next_sibling
+            station = StopClass(e.string, stop.string.strip(), start.string.strip())
+            stops.append(station)
+
+        return TrainClass(trainNo, stops)
+    except Exception as e:
+        print(e)
+
+
+Dtrains = []
+for train in listD:
+    Dtrains.append(getTrainInfo(train))
+
+print(Dtrains)
+
+
+
