@@ -3,6 +3,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import collections
+import time
 
 
 # 下载所有的车次数据 | 保存为 tnumber_datas.txt 文件
@@ -163,11 +164,22 @@ def getTrainInfo(trainNo='G1'):
         print(e)
 
 
-Dtrains = []
-for train in listD:
-    Dtrains.append(getTrainInfo(train))
+'''
+# crawle and save to file
+Gtrains = []
+i = 0
+for train in listG:
+    Gtrains.append(getTrainInfo(train))
+    if i % 100 == 0:
+        print(i)
+    time.sleep(0.1)
+    i = i+1
 
-print(Dtrains)
+with open('Gtrain_infos.json', 'w', encoding='gb2312') as fd:
+    fd.write(json.dumps(Gtrains))
+
+'''
+print('OK')
 
 
 
