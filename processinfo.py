@@ -170,16 +170,24 @@ def main():
     print(sorted(btw.items(), key=lambda x: (x[1]), reverse=True))
 
     deg = G.degree()
+    print(sorted(deg, key=lambda x: (x[1]), reverse=True))
+    data = [x[1] for x in deg if x[1] > 0]
+    data1 = [len(bin(d))-1 for d in data]
+
+    
     sub = [node[0] for node in deg if node[1] == 2]
 
     addons = [ '湛江', '北海', '福州', '上海']
     st = set(sub) | set(addons)
+
+    
     
     btw = nx.algorithms.centrality.betweenness_centrality_subset(G,  weight='time', sources=st, targets=st)
     print(sorted(btw.items(), key=lambda x: (x[1]), reverse=True))
     btw = nx.algorithms.centrality.betweenness_centrality_subset(G, sources=st, targets=st)
-    print(sorted(btw.items(), key=lambda x: (x[1]), reverse=True))
-'''
+    print(sorted(btw.items(), key=lambda x: (x[1]), reverse=True)'''
+    
+
     # 二部图
     edges, odd = getS_Tedge(stations)
     print(len(odd))
@@ -194,20 +202,24 @@ def main():
     print(ind)
     print(sorted(ind, key=lambda x: (x[1]), reverse=True))
     data = [x[1] for x in ind if x[1] > 0]
-    print(data)
-    plt.hist(data, bins=100)
-    plt.show()
+    data1 = [len(bin(d)) - 1 for d in data]
 
+
+    # print(data)
+    plt.hist(data1, bins=100)
+    plt.show()
+'''
     fig1, ax1 = plt.subplots()
-    ax1.hist(data, bins=1000)
+    ax1.hist(data, bins=100)
     ax1.set_xscale("log")
-    ax1.set_xlim(1e0, 1e3)
+    ax1.set_xlim(1e0, 1e2)
     ax1.grid()
     plt.draw()
-    plt.show()
+    plt.show()'''
 
 
 if __name__ == "__main__":
     main()
+
 
 
