@@ -1,12 +1,12 @@
 import re
 import json
 import requests
-import pandas as pd
+from bs4 import BeautifulSoup
+import collections
+import time
 
 
-'''
-下载所有的车次数据 | 保存为 tnumber_datas.txt 文件  
-'''
+# 下载所有的车次数据 | 保存为 tnumber_datas.txt 文件
 def download_tnumber_datas(tn_datas_url):
     requests.adapters.DEFAULT_RETRIES = 5
     response = requests.get(tn_datas_url, stream=True,verify=False)
@@ -18,12 +18,13 @@ def download_tnumber_datas(tn_datas_url):
                     tfile.write(chunk)
 
 
-###下载需要的文件
-#tn_datas_url='https://kyfw.12306.cn/otn/resources/js/query/train_list.js?scriptVersion=1.0'
-#download_tnumber_datas(tn_datas_url)
+'''
+# 下载需要的文件
+tn_datas_url='https://kyfw.12306.cn/otn/resources/js/query/train_list.js?scriptVersion=1.0'
+download_tnumber_datas(tn_datas_url)
 
-#station_datas_url='https://kyfw.12306.cn/otn/resources/js/framework/station_name.js?station_version=1.9002'
-#download_tnumber_datas(station_datas_url)
+station_datas_url='https://kyfw.12306.cn/otn/resources/js/framework/station_name.js?station_version=1.9002'
+download_tnumber_datas(station_datas_url)
 
 
 #分析train_list.txt文件 得出火车 出发站到终点站的数据
@@ -80,7 +81,7 @@ def getTrainNoList(back_date, train_date, from_station, from_station_name, to_st
 
 
 #trainListStartToEnd()
-
+'''
 
 # 提取动车、高铁信息
 
@@ -136,4 +137,49 @@ listG = [e['station_train_code'] for e in strJson]
 print(len(listG),listG)
 f.close()
 
-baseurl = 'https://trains.ctrip.com/trainbooking/TrainSchedule/G1/?&mkt_header=bdkx&ouid=56474440-alading_cc-'
+baseurl = 'https://trains.ctrip.com/trainbooking/TrainSchedule/'
+
+StopClass = collections.namedtuple('StopClass', ['name', 'stop', 'start'])
+TrainClass = collections.namedtuple('TrainClass', ['train', 'stops'])
+
+
+def getTrainInfo(trainNo='G1'):
+    try:
+        r = requests.get(baseurl+trainNo)
+        r.raise_for_status()
+        r.encoding = "gb2312"
+
+        soup = BeautifulSoup(r.text.replace("\n", ""), 'html.parser')
+        target_regexp = re.compile(r'ctl00\_MainContentPlaceHolder\_rptStopOverStation.*')
+        tt = soup.find_all(id=target_regexp)
+        stops = []
+        for e in tt:
+            stop = e.parent.next_sibling.next_sibling
+            start = stop.next_sibling.next_sibling
+            station = StopClass(e.string, stop.string.strip(), start.string.strip())
+            stops.append(station)
+
+        return TrainClass(trainNo, stops)
+    except Exception as e:
+        print(e)
+
+
+'''
+# crawle and save to file
+Gtrains = []
+i = 0
+for train in listG:
+    Gtrains.append(getTrainInfo(train))
+    if i % 100 == 0:
+        print(i)
+    time.sleep(0.1)
+    i = i+1
+
+with open('Gtrain_infos.json', 'w', encoding='gb2312') as fd:
+    fd.write(json.dumps(Gtrains))
+
+'''
+print('OK')
+
+
+
