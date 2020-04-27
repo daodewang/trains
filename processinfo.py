@@ -2,96 +2,82 @@ import json
 import networkx as nx
 from operator import itemgetter
 import matplotlib.pyplot as plt
+import requests
 
 
-def getSandT():
+# 将车站转换为所在的城市
+def s2c(station):
+    key = '27ea3472ed190ddbc5e3160188e74111'
+    address = station + '站'
+    url = f'https://restapi.amap.com/v3/geocode/geo?address={address}&key={key}'
+
+    r = requests.get(url)
+    #print('addr: ' + address)
+    #print(r)
+    info = r.json()
+
+    if info['count'] == '0':  # 未查到该车站
+        return 0
+    else:
+        city = info['geocodes'][0]['city']
+        return city
+
+
+# 将时刻表转化为图的节点和边
+# Dtrain_infos.json, Gtrain_infos.json 保存了每个车次的时刻表，包括站名，到站时间，离站时间
+def getNandE():
     stations = set()
     trains = []
-    with open('Dtrain_infos.json', 'r', encoding='utf-8') as f:
-        dinfo = json.load(f)
-        #print(len(dinfo))
-
-        for train in dinfo:
-            trains.append(train[0])
-            for stop in train[1]:
-                stations.add(stop[0])
-
-    with open('Gtrain_infos.json', 'r', encoding='utf-8') as f:
-        dinfo = json.load(f)
-        #print(len(dinfo))
-
-        for train in dinfo:
-            trains.append(train[0])
-            for stop in train[1]:
-                stations.add(stop[0])
-
-    return stations, trains
-
-
-def sta2city(k, citys):
-    r = False
-
-    if k == '上海虹桥':
-        r = True
-        k = '上海'
-    if k == '合肥北城':
-        r = True
-        k = '合肥'
-    if k == '戚墅堰':
-        r = True
-        k = '常州'
-    if k == '深圳坪山':
-        r = True
-        k = '深圳'
-    if k in {'汉口', '武昌', '天河机场', '毛陈', '金银潭'}:
-        r = True
-        k = '武汉'
-    if k[-1] in {'东', '南', '西', '北'} and len(k) > 2:
-        r = True
-        k = k[0:-1]
-
-    return r, k
-
-
-def getTimePaths(citys):
     paths = dict()
+    odds = set()
+    oddsPaths = dict()
     with open('Dtrain_infos.json', 'r', encoding='utf-8') as f:
         dinfo = json.load(f)
+        # print(len(dinfo))
+        i0 = 0
 
         for train in dinfo:
-            L = len(train[1])
-            for i in range(L-2):
-                r, k1 = sta2city(train[1][i][0], citys)
-                r, k2 = sta2city(train[1][i+1][0], citys)
+            trains.append(train[0])
+            print(f'{i0}' + train[0])
 
-                edgekey = str(k1) + '-' + str(k2)
-                start = train[1][i][2].split(':')
-                arrive = train[1][i+1][2].split(':')
-                weight = 60*(int(arrive[0])-int(start[0]))+(int(arrive[1])-int(start[1]))
-                if edgekey in paths:
-                    paths[edgekey].append(weight)
+            i0 = i0+1
+            if i0 == 5:
+                break
+
+            for stop in train[1]:
+                #print('stop: ' + stop[0])
+                city = s2c(stop[0])
+                if city == 0:
+                    odds.add(stop[0])
                 else:
-                    paths[edgekey] = [weight]
+                    stations.add(city)
 
-    with open('Gtrain_infos.json', 'r', encoding='utf-8') as f:
-            dinfo = json.load(f)
+            LEN = len(train[1])
+            for i in range(LEN - 2):
+                k1 = s2c(train[1][i][0])
+                k2 = s2c(train[1][i + 1][0])
 
-            for train in dinfo:
-                L = len(train[1])
-                for i in range(L - 2):
-                    r, k1 = sta2city(train[1][i][0], citys)
-                    r, k2 = sta2city(train[1][i + 1][0], citys)
+                start = train[1][i][2].split(':')
+                arrive = train[1][i + 1][2].split(':')
+                weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
 
-                    edgekey = str(k1) + '-' + str(k2)
-                    start = train[1][i][2].split(':')
-                    arrive = train[1][i + 1][2].split(':')
-                    weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
-                    if edgekey in paths:
-                        paths[edgekey].append(weight)
+                if k1 == 0 or k2 == 0:
+                    edgekey = train[1][i][0] + '-' + train[1][i + 1][0]
+                    if edgekey in oddsPaths:
+                        oddsPaths[edgekey].append((weight, train[0]))
                     else:
-                        paths[edgekey] = [weight]
+                        oddsPaths[edgekey] = [(weight, train[0])]
+                else:
+                    edgekey = str(k1) + '-' + str(k2)
+                    if edgekey in paths:
+                        paths[edgekey].append((weight, train[0]))
+                    else:
+                        paths[edgekey] = [(weight, train[0])]
 
-    return paths
+    print(stations)
+    print(trains)
+    print(paths)
+    print(oddsPaths)
 
 
 def getTimeEdges(paths):
@@ -103,6 +89,7 @@ def getTimeEdges(paths):
     return edges
 
 
+'''
 def getEdges(paths):
     edges = []
     for k, v in paths.items():
@@ -140,9 +127,12 @@ def getS_Tedge(stations):
                     k = k1
                 edges.append((train[0], k))
     return edges, odd
+'''
 
 
 def main():
+    getNandE()
+    '''
     G = nx.DiGraph()
 
     stations, trains = getSandT()
@@ -158,7 +148,7 @@ def main():
     paths = getTimePaths(sj)
     timedges = getTimeEdges(paths)
 
-    '''
+    
     # 赋权图
     G.add_nodes_from(sj)
     G.add_edges_from(timedges)
@@ -185,7 +175,7 @@ def main():
     btw = nx.algorithms.centrality.betweenness_centrality_subset(G,  weight='time', sources=st, targets=st)
     print(sorted(btw.items(), key=lambda x: (x[1]), reverse=True))
     btw = nx.algorithms.centrality.betweenness_centrality_subset(G, sources=st, targets=st)
-    print(sorted(btw.items(), key=lambda x: (x[1]), reverse=True)'''
+    print(sorted(btw.items(), key=lambda x: (x[1]), reverse=True)
     
 
     # 二部图
@@ -208,7 +198,7 @@ def main():
     # print(data)
     plt.hist(data1, bins=100)
     plt.show()
-'''
+
     fig1, ax1 = plt.subplots()
     ax1.hist(data, bins=100)
     ax1.set_xscale("log")
