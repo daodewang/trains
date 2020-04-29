@@ -102,6 +102,85 @@ def getSch(inshorter, outjson):
         fd.write(json.dumps(Trains))
 
 
+# 将车站转换为所在的城市
+def s2c(station):
+    key = '27ea3472ed190ddbc5e3160188e74111'
+    address = station + '站'
+    url = f'https://restapi.amap.com/v3/geocode/geo?address={address}&key={key}'
+
+    r = requests.get(url)
+    #print('addr: ' + address)
+    #print(r)
+    info = r.json()
+
+    if info['count'] == '0':  # 未查到该车站
+        return 0
+    else:
+        city = info['geocodes'][0]['city']
+        return city
+
+
+# 将时刻表转化为图的节点和边（初步）
+# Dtrain_infos.json, Gtrain_infos.json 保存了每个车次的时刻表，包括站名，到站时间，离站时间
+# 从这两个文件中提取出图的节点-城市，边（一站连接的两个城市，）
+# 节点用集合stations表示
+# 每条边用一个字典元素表示，键名为“某站-某站”，值为一个列表，列表元素为（时间，车次）
+# 在高德地图上查不到所在城市的车站和关联的边保存至odds和oddsPaths
+def getNandE(injson, outjson):
+    stations = set()    # xx市
+    trains = []
+    paths = dict()
+    odds = set()
+    oddsPaths = dict()
+    with open(injson, 'r', encoding='utf-8') as f:
+        dinfo = json.load(f)
+        # print(len(dinfo))
+        i0 = 0
+
+        for train in dinfo:
+            trains.append(train[0])
+
+            if i0 % 100 == 0:
+                print(train[0])
+            i0 = i0 + 1
+
+            for stop in train[1]:
+                #print('stop: ' + stop[0])
+                city = s2c(stop[0])
+                if city == 0:
+                    odds.add(stop[0])
+                else:
+                    stations.add(city)
+
+            LEN = len(train[1])
+            for i in range(LEN - 2):
+                k1 = s2c(train[1][i][0])
+                k2 = s2c(train[1][i + 1][0])
+
+                start = train[1][i][2].split(':')
+                arrive = train[1][i + 1][2].split(':')
+                weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
+
+                if k1 == 0 or k2 == 0:
+                    edgekey = train[1][i][0] + '-' + train[1][i + 1][0]
+                    if edgekey in oddsPaths:
+                        oddsPaths[edgekey].append((weight, train[0]))
+                    else:
+                        oddsPaths[edgekey] = [(weight, train[0])]
+                else:
+                    edgekey = k1 + '-' + k2   # xx市-xx市
+                    if edgekey in paths:
+                        paths[edgekey].append((weight, train[0]))
+                    else:
+                        paths[edgekey] = [(weight, train[0])]
+
+    out = (stations, paths, odds, oddsPaths)
+    print(out)
+
+    with open(outjson, 'w', encoding='gb2312') as fd:
+        fd.write(json.dumps(out))
+
+
 def main():
     # 下载需要的文件
     tn_data_url = 'https://kyfw.12306.cn/otn/resources/js/query/train_list.js?scriptVersion=1.0'
@@ -113,7 +192,8 @@ def main():
     #get_train_info()
 
     #getSch('Dshorter_list.txt', 'Dtrain_infos.json')
-    getSch('Gshorter_list.txt', 'Gtrain_infos.json')
+    #getSch('Gshorter_list.txt', 'Gtrain_infos.json')
+    getNandE('Dtrain_infos.json', 'DNode_Edge.json')
 
 
 if __name__ == "__main__":
