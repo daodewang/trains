@@ -102,22 +102,33 @@ def getSch(inshorter, outjson):
         fd.write(json.dumps(Trains))
 
 
+# 避免重复查询，把已查记录存好
+SC = dict()
+
+
 # 将车站转换为所在的城市
 def s2c(station):
-    key = '27ea3472ed190ddbc5e3160188e74111'
     address = station + '站'
-    url = f'https://restapi.amap.com/v3/geocode/geo?address={address}&key={key}'
-
-    r = requests.get(url)
-    #print('addr: ' + address)
-    #print(r)
-    info = r.json()
-
-    if info['count'] == '0':  # 未查到该车站
-        return 0
+    if address in SC:
+        return SC[address]
     else:
-        city = info['geocodes'][0]['city']
-        return city
+        key = '27ea3472ed190ddbc5e3160188e74111'
+        url = f'https://restapi.amap.com/v3/geocode/geo?address={address}&key={key}'
+
+        r = requests.get(url)
+        info = r.json()
+
+        if info['count'] == '0':  # 未查到该车站
+            SC[address] = 0
+            return 0
+        else:
+            city = info['geocodes'][0]['city']
+            if city == []:
+                SC[address] = 0
+                return 0
+            else:
+                SC[address] = city
+                return city
 
 
 # 将时刻表转化为图的节点和边（初步）
@@ -150,7 +161,14 @@ def getNandE(injson, outjson):
                 if city == 0:
                     odds.add(stop[0])
                 else:
-                    stations.add(city)
+                    try:
+                        stations.add(city)
+                    except:
+                        print('error!')
+                        print(SC)
+                        print(city)
+                        print(stop[0])
+                        return 0
 
             LEN = len(train[1])
             for i in range(LEN - 2):
@@ -174,8 +192,7 @@ def getNandE(injson, outjson):
                     else:
                         paths[edgekey] = [(weight, train[0])]
 
-    out = (stations, paths, odds, oddsPaths)
-    print(out)
+    out = (list(stations), paths, list(odds), oddsPaths)
 
     with open(outjson, 'w', encoding='gb2312') as fd:
         fd.write(json.dumps(out))
@@ -193,7 +210,8 @@ def main():
 
     #getSch('Dshorter_list.txt', 'Dtrain_infos.json')
     #getSch('Gshorter_list.txt', 'Gtrain_infos.json')
-    getNandE('Dtrain_infos.json', 'DNode_Edge.json')
+    #getNandE('Dtrain_infos.json', 'DNode_Edge.json')
+    getNandE('Gtrain_infos.json', 'GNode_Edge.json')
 
 
 if __name__ == "__main__":

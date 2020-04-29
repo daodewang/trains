@@ -5,79 +5,25 @@ import matplotlib.pyplot as plt
 import requests
 
 
-# 将车站转换为所在的城市
-def s2c(station):
-    key = '27ea3472ed190ddbc5e3160188e74111'
-    address = station + '站'
-    url = f'https://restapi.amap.com/v3/geocode/geo?address={address}&key={key}'
-
-    r = requests.get(url)
-    #print('addr: ' + address)
-    #print(r)
-    info = r.json()
-
-    if info['count'] == '0':  # 未查到该车站
-        return 0
-    else:
-        city = info['geocodes'][0]['city']
-        return city
 
 
-# 将时刻表转化为图的节点和边
-# Dtrain_infos.json, Gtrain_infos.json 保存了每个车次的时刻表，包括站名，到站时间，离站时间
-def getNandE():
-    stations = set()
-    trains = []
-    paths = dict()
-    odds = set()
-    oddsPaths = dict()
-    with open('Dtrain_infos.json', 'r', encoding='utf-8') as f:
-        dinfo = json.load(f)
-        # print(len(dinfo))
-        i0 = 0
 
-        for train in dinfo:
-            trains.append(train[0])
-            print(f'{i0}' + train[0])
+# 将上一步的到的paths转换为无向图的边
+def getUDEdges(paths):
+    edges = []
+    for k in paths.items():
+        node = k.split('-')
+        edges.append((node[0], node[1]))
+    return edges
 
-            i0 = i0+1
-            if i0 == 5:
-                break
 
-            for stop in train[1]:
-                #print('stop: ' + stop[0])
-                city = s2c(stop[0])
-                if city == 0:
-                    odds.add(stop[0])
-                else:
-                    stations.add(city)
-
-            LEN = len(train[1])
-            for i in range(LEN - 2):
-                k1 = s2c(train[1][i][0])
-                k2 = s2c(train[1][i + 1][0])
-
-                start = train[1][i][2].split(':')
-                arrive = train[1][i + 1][2].split(':')
-                weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
-
-                if k1 == 0 or k2 == 0:
-                    edgekey = train[1][i][0] + '-' + train[1][i + 1][0]
-                    if edgekey in oddsPaths:
-                        oddsPaths[edgekey].append((weight, train[0]))
-                    else:
-                        oddsPaths[edgekey] = [(weight, train[0])]
-                else:
-                    edgekey = str(k1) + '-' + str(k2)
-                    if edgekey in paths:
-                        paths[edgekey].append((weight, train[0]))
-                    else:
-                        paths[edgekey] = [(weight, train[0])]
-
-    print(stations)
-    print(trains)
-    print(paths)
-    print(oddsPaths)
+def getCBEdges(paths):
+    edges = []
+    for k, v in paths.items():
+        weight = len(v)
+        node = k.split('-')
+        edges.append((node[0], node[1], {'no': weight}))
+    return edges
 
 
 def getTimeEdges(paths):
@@ -131,7 +77,13 @@ def getS_Tedge(stations):
 
 
 def main():
-    getNandE()
+    stations, paths, odds, oddsPaths = getNandE('Dtrain_infos.json')
+    print(stations)
+    print(paths)
+    paths(odds)
+    print(oddsPaths)
+
+
     '''
     G = nx.DiGraph()
 
