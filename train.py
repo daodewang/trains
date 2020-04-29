@@ -74,6 +74,10 @@ def crawlTrainInfo(trainNo='G1'):
             stop = e.parent.next_sibling.next_sibling
             start = stop.next_sibling.next_sibling
             station = StopClass(e.string, stop.string.strip(), start.string.strip())
+            if station == '畲江北':
+                print(trainNo)
+                print(r.text)
+                break
             stops.append(station)
 
         return TrainClass(trainNo, stops)
@@ -208,10 +212,10 @@ def main():
 
     #get_train_info()
 
-    #getSch('Dshorter_list.txt', 'Dtrain_infos.json')
+    getSch('Dshorter_list.txt', 'Dtrain_infos.json')
     #getSch('Gshorter_list.txt', 'Gtrain_infos.json')
     #getNandE('Dtrain_infos.json', 'DNode_Edge.json')
-    getNandE('Gtrain_infos.json', 'GNode_Edge.json')
+    #getNandE('Gtrain_infos.json', 'GNode_Edge.json')
 
 
 if __name__ == "__main__":

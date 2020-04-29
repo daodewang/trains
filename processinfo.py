@@ -5,9 +5,6 @@ import matplotlib.pyplot as plt
 import requests
 
 
-
-
-
 # 将上一步的到的paths转换为无向图的边
 def getUDEdges(paths):
     edges = []
@@ -35,53 +32,18 @@ def getTimeEdges(paths):
     return edges
 
 
-'''
-def getEdges(paths):
-    edges = []
-    for k, v in paths.items():
-        weight = len(v)
-        nodes = k.split('-')
-        edges.append((nodes[0], nodes[1], {'weight': weight}))
-
-    return edges
-
-
-def getS_Tedge(stations):
-    edges = []
-    odd = set()
-    with open('Dtrain_infos.json', 'r', encoding='utf-8') as f:
+def loadinfo(injson):
+    with open(injson, 'r', encoding='utf-8') as f:
         dinfo = json.load(f)
-
-        for train in dinfo:
-            for stop in train[1]:
-                k = stop[0]
-                r, k1 = sta2city(k, stations)
-                if r:
-                    odd.add(k)
-                    k = k1
-                edges.append((train[0], k))
-
-    with open('Gtrain_infos.json', 'r', encoding='utf-8') as f:
-        dinfo = json.load(f)
-
-        for train in dinfo:
-            for stop in train[1]:
-                k = stop[0]
-                r, k1 = sta2city(k, stations)
-                if r:
-                    odd.add(k)
-                    k = k1
-                edges.append((train[0], k))
-    return edges, odd
-'''
+        return dinfo
 
 
 def main():
-    stations, paths, odds, oddsPaths = getNandE('Dtrain_infos.json')
-    print(stations)
-    print(paths)
-    paths(odds)
-    print(oddsPaths)
+
+    Dinfo = loadinfo('DNode_Edge.json')
+    print(len(Dinfo[2]))
+    print(Dinfo[2])
+    print(len(Dinfo[3]))
 
 
     '''
