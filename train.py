@@ -56,6 +56,10 @@ def get_train_info():
         print(listG)
 
 
+# 为了找错，存储爬取的网页
+TMP = 0
+
+
 # 去携程爬取指定车次的时刻表
 def crawlTrainInfo(trainNo='G1'):
     baseurl = 'https://trains.ctrip.com/trainbooking/TrainSchedule/'
@@ -64,7 +68,9 @@ def crawlTrainInfo(trainNo='G1'):
     try:
         r = requests.get(baseurl+trainNo)
         r.raise_for_status()
-        r.encoding = "gb2312"
+        r.encoding = "gbk"
+        global TMP
+        TMP = r.text
 
         soup = BeautifulSoup(r.text.replace("\n", ""), 'html.parser')
         target_regexp = re.compile(r'ctl00\_MainContentPlaceHolder\_rptStopOverStation.*')
@@ -74,10 +80,6 @@ def crawlTrainInfo(trainNo='G1'):
             stop = e.parent.next_sibling.next_sibling
             start = stop.next_sibling.next_sibling
             station = StopClass(e.string, stop.string.strip(), start.string.strip())
-            if station == '畲江北':
-                print(trainNo)
-                print(r.text)
-                break
             stops.append(station)
 
         return TrainClass(trainNo, stops)
@@ -85,34 +87,25 @@ def crawlTrainInfo(trainNo='G1'):
         print(e)
 
 
-# 获取列车时刻表，保存到json文件
-def getSch(inshorter, outjson):
-    f = open(inshorter, 'r', encoding='utf-8')
-    strJson = json.load(f)
-    listT = [e['station_train_code'] for e in strJson]
-    print(len(listT), listT)
-    f.close()
-
-    Trains = []
-    i = 0
-    for train in listT:
-        Trains.append(crawlTrainInfo(train))
-        if i % 100 == 0:
-            print(i)
-        time.sleep(0.1)
-        i = i + 1
-
-    with open(outjson, 'w', encoding='gb2312') as fd:
-        fd.write(json.dumps(Trains))
-
-
 # 避免重复查询，把已查记录存好
 SC = dict()
+
+
+# 将文件中的站-城映射保存到SC
+def initSC(infile):
+    for line in open(infile, 'r', encoding='utf-8'):
+        print(line)
+        mapping = line.split('-')
+        s = mapping[0]
+        c = mapping[1].strip('\n')
+        if s not in SC:
+            SC[s] = c
 
 
 # 将车站转换为所在的城市
 def s2c(station):
     address = station + '站'
+    global SC
     if address in SC:
         return SC[address]
     else:
@@ -123,11 +116,13 @@ def s2c(station):
         info = r.json()
 
         if info['count'] == '0':  # 未查到该车站
+            print(station)
             SC[address] = 0
             return 0
         else:
             city = info['geocodes'][0]['city']
             if city == []:
+                print(station)
                 SC[address] = 0
                 return 0
             else:
@@ -135,70 +130,79 @@ def s2c(station):
                 return city
 
 
+# 获取列车时刻表，保存到json文件
 # 将时刻表转化为图的节点和边（初步）
 # Dtrain_infos.json, Gtrain_infos.json 保存了每个车次的时刻表，包括站名，到站时间，离站时间
 # 从这两个文件中提取出图的节点-城市，边（一站连接的两个城市，）
 # 节点用集合stations表示
 # 每条边用一个字典元素表示，键名为“某站-某站”，值为一个列表，列表元素为（时间，车次）
 # 在高德地图上查不到所在城市的车站和关联的边保存至odds和oddsPaths
-def getNandE(injson, outjson):
-    stations = set()    # xx市
-    trains = []
+def getSch(inshorter, type='D'):
+    f = open(inshorter, 'r', encoding='utf-8')
+    strJson = json.load(f)
+    listT = [e['station_train_code'] for e in strJson]
+    #print(len(listT), listT)
+    f.close()
+
+    log = []
+
+    Trains = []
+
+    TNs = []
+    stations = set()  # xx市
     paths = dict()
     odds = set()
     oddsPaths = dict()
-    with open(injson, 'r', encoding='utf-8') as f:
-        dinfo = json.load(f)
-        # print(len(dinfo))
-        i0 = 0
+    i = 0
+    for train in listT:
+        infos = crawlTrainInfo(train)
+        trainNo = infos[0]
+        Trains.append(infos)
+        if i % 100 == 0:
+            print(i)
+        time.sleep(0.1)
+        i = i + 1
 
-        for train in dinfo:
-            trains.append(train[0])
+        TNs.append(trainNo)
 
-            if i0 % 100 == 0:
-                print(train[0])
-            i0 = i0 + 1
+        for stop in infos[1]:
+            # print('stop: ' + stop[0])
+            city = s2c(stop[0])
+            if city == 0:
+                odds.add(stop[0])
+                log.append(TMP)
+                print(trainNo + ' ' + stop[0])
+            else:
+                stations.add(city)
 
-            for stop in train[1]:
-                #print('stop: ' + stop[0])
-                city = s2c(stop[0])
-                if city == 0:
-                    odds.add(stop[0])
+        LEN = len(train[1])
+        for i in range(LEN - 2):
+            k1 = s2c(train[1][i][0])
+            k2 = s2c(train[1][i + 1][0])
+
+            start = train[1][i][2].split(':')
+            arrive = train[1][i + 1][2].split(':')
+            weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
+
+            if k1 == 0 or k2 == 0:
+                edgekey = train[1][i][0] + '-' + train[1][i + 1][0]
+                if edgekey in oddsPaths:
+                    oddsPaths[edgekey].append((weight, train[0]))
                 else:
-                    try:
-                        stations.add(city)
-                    except:
-                        print('error!')
-                        print(SC)
-                        print(city)
-                        print(stop[0])
-                        return 0
-
-            LEN = len(train[1])
-            for i in range(LEN - 2):
-                k1 = s2c(train[1][i][0])
-                k2 = s2c(train[1][i + 1][0])
-
-                start = train[1][i][2].split(':')
-                arrive = train[1][i + 1][2].split(':')
-                weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
-
-                if k1 == 0 or k2 == 0:
-                    edgekey = train[1][i][0] + '-' + train[1][i + 1][0]
-                    if edgekey in oddsPaths:
-                        oddsPaths[edgekey].append((weight, train[0]))
-                    else:
-                        oddsPaths[edgekey] = [(weight, train[0])]
+                    oddsPaths[edgekey] = [(weight, train[0])]
+            else:
+                edgekey = k1 + '-' + k2  # xx市-xx市
+                if edgekey in paths:
+                    paths[edgekey].append((weight, train[0]))
                 else:
-                    edgekey = k1 + '-' + k2   # xx市-xx市
-                    if edgekey in paths:
-                        paths[edgekey].append((weight, train[0]))
-                    else:
-                        paths[edgekey] = [(weight, train[0])]
+                    paths[edgekey] = [(weight, train[0])]
 
     out = (list(stations), paths, list(odds), oddsPaths)
 
-    with open(outjson, 'w', encoding='gb2312') as fd:
+    with open(type + 'train_infos.json', 'w', encoding='utf-8') as fd:
+        fd.write(json.dumps(Trains))
+
+    with open(type + 'Node_Edge.json', 'w', encoding='utf-8') as fd:
         fd.write(json.dumps(out))
 
 
@@ -212,10 +216,10 @@ def main():
 
     #get_train_info()
 
-    getSch('Dshorter_list.txt', 'Dtrain_infos.json')
-    #getSch('Gshorter_list.txt', 'Gtrain_infos.json')
-    #getNandE('Dtrain_infos.json', 'DNode_Edge.json')
-    #getNandE('Gtrain_infos.json', 'GNode_Edge.json')
+    initSC('oddstations.txt')
+
+    getSch('Dshorter_list.txt', 'D')
+    getSch('Gshorter_list.txt', 'G')
 
 
 if __name__ == "__main__":
