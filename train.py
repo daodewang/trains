@@ -218,7 +218,7 @@ def main():
 
     initSC('oddstations.txt')
 
-    getSch('Dshorter_list.txt', 'D')
+    #getSch('Dshorter_list.txt', 'D')
     getSch('Gshorter_list.txt', 'G')
 
 
