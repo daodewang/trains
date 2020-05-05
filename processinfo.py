@@ -8,7 +8,7 @@ import requests
 # 将上一步的到的paths转换为无向图的边
 def getUDEdges(paths):
     edges = []
-    for k in paths.items():
+    for k in paths:
         node = k.split('-')
         edges.append((node[0], node[1]))
     return edges
@@ -26,10 +26,38 @@ def getCBEdges(paths):
 def getTimeEdges(paths):
     edges = []
     for k, v in paths.items():
-        weight = int(sum(v)/len(v))
+        tl = [e[0] for e in v]
+        weight = int(sum(tl)/len(v))
         nodes = k.split('-')
         edges.append((nodes[0], nodes[1], {'time': weight}))
     return edges
+
+
+# 去掉 x-x 的边
+def popdict(dict):
+    list = []
+    for path in dict:
+        if path.split('-')[0] == path.split('-')[1]:
+            list.append(path)
+
+    for path in list:
+        dict.pop(path)
+
+
+# 把动车，高铁的边集合并
+def mergedges(dpaths, gpaths):
+    allpaths = dict()
+    for k in dpaths:
+        allpaths[k] = dpaths[k]
+
+    for kk in gpaths:
+        if kk in allpaths:
+            allpaths[kk].extend(gpaths[kk])
+        else:
+            allpaths[kk] = gpaths[kk]
+
+    return allpaths
+
 
 
 def loadinfo(injson):
@@ -41,10 +69,48 @@ def loadinfo(injson):
 def main():
 
     Dinfo = loadinfo('DNode_Edge.json')
-    print(len(Dinfo[2]))
-    print(Dinfo[2])
-    print(len(Dinfo[3]))
+    dstations = Dinfo[0]
+    print(dstations)
+    Dpaths = Dinfo[1]
+    print(len(Dpaths))
 
+    popdict(Dpaths)
+    print(len(Dpaths))
+
+    #print(Dpaths)
+
+    Ginfo = loadinfo('GNode_Edge.json')
+    gstations = Ginfo[0]
+    print(gstations)
+    Gpaths = Ginfo[1]
+    print(len(Gpaths))
+
+    popdict(Gpaths)
+    print(len(Dpaths))
+
+    #print(Gpaths)
+
+    paths = mergedges(Dpaths, Gpaths)
+    print(len(paths))
+    print(paths)
+
+    UDedges = getUDEdges(paths)
+    CBEdges = getCBEdges(paths)
+    TimeEdges = getTimeEdges(paths)
+    nodes = set(dstations) | set(gstations)
+
+
+    print(UDedges)
+    print(CBEdges)
+    print(TimeEdges)
+    print(len(nodes))
+
+    G = nx.DiGraph()
+    G.add_nodes_from(nodes)
+    G.add_edges_from(UDedges)
+
+    deg = G.degree()
+    print(sorted(deg, key=lambda x: (x[1]), reverse=True))
 
     '''
     G = nx.DiGraph()
