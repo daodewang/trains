@@ -175,35 +175,36 @@ def getSch(inshorter, type='D'):
             else:
                 stations.add(city)
 
-        LEN = len(train[1])
-        for i in range(LEN - 2):
-            k1 = s2c(train[1][i][0])
-            k2 = s2c(train[1][i + 1][0])
+        LEN = len(infos[1])
 
-            start = train[1][i][2].split(':')
-            arrive = train[1][i + 1][2].split(':')
+        for ti in range(LEN - 2):
+            k1 = s2c(infos[1][ti][0])
+            k2 = s2c(infos[1][ti + 1][0])
+
+            start = infos[1][ti][2].split(':')
+            arrive = infos[1][ti + 1][2].split(':')
             weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
 
             if k1 == 0 or k2 == 0:
-                edgekey = train[1][i][0] + '-' + train[1][i + 1][0]
+                edgekey = infos[1][ti][0] + '-' + infos[1][ti + 1][0]
                 if edgekey in oddsPaths:
-                    oddsPaths[edgekey].append((weight, train[0]))
+                    oddsPaths[edgekey].append((weight, infos[0]))
                 else:
-                    oddsPaths[edgekey] = [(weight, train[0])]
+                    oddsPaths[edgekey] = [(weight, infos[0])]
             else:
                 edgekey = k1 + '-' + k2  # xx市-xx市
                 if edgekey in paths:
-                    paths[edgekey].append((weight, train[0]))
+                    paths[edgekey].append((weight, infos[0]))
                 else:
-                    paths[edgekey] = [(weight, train[0])]
+                    paths[edgekey] = [(weight, infos[0])]
 
     out = (list(stations), paths, list(odds), oddsPaths)
 
-    with open(type + 'train_infos.json', 'w', encoding='utf-8') as fd:
-        fd.write(json.dumps(Trains))
+    with open(type + 'train_infos.json', 'w', encoding='utf-8') as ft:
+        ft.write(json.dumps(Trains))
 
-    with open(type + 'Node_Edge.json', 'w', encoding='utf-8') as fd:
-        fd.write(json.dumps(out))
+    with open(type + 'Node_Edge.json', 'w', encoding='utf-8') as fn:
+        fn.write(json.dumps(out))
 
 
 def main():
@@ -218,8 +219,8 @@ def main():
 
     initSC('oddstations.txt')
 
-    #getSch('Dshorter_list.txt', 'D')
-    getSch('Gshorter_list.txt', 'G')
+    getSch('Dshorter_list.txt', 'D')
+    #gzgetSch('Gshorter_list.txt', 'G')
 
 
 if __name__ == "__main__":
