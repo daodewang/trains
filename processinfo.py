@@ -67,6 +67,18 @@ def loadinfo(injson):
 
 
 def main():
+    f = open('Dshorter_list.txt', 'r', encoding='utf-8')
+    strJson = json.load(f)
+    print(strJson)
+    print(len(strJson))
+    f.close()
+    f = open('Gshorter_list.txt', 'r', encoding='utf-8')
+    strJson = json.load(f)
+    print(strJson)
+    print(len(strJson))
+    f.close()
+
+    '''
 
     Dinfo = loadinfo('DNode_Edge.json')
     dstations = Dinfo[0]
@@ -112,7 +124,7 @@ def main():
     deg = G.degree()
     print(sorted(deg, key=lambda x: (x[1]), reverse=True))
 
-    '''
+    
     G = nx.DiGraph()
 
     stations, trains = getSandT()
