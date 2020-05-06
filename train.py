@@ -157,13 +157,14 @@ def s2c(station):
         info = r.json()
 
         if info['count'] == '0':  # 未查到该车站
-            print(station)
+            print(address)
+            newOS.add(address)
             SC[address] = 0
             return 0
         else:
             city = info['geocodes'][0]['city']
             if city == []:
-                newOS.add(city)
+                newOS.add(address)
                 SC[address] = 0
                 return 0
             else:
@@ -212,63 +213,67 @@ def getSch(inshorter, type='D', jixu=0):
         print(listT)
 
     i = 0
-    for train in listT:
-        try:
-            infos = crawlTrainInfo_gaotie(train)
-        except Exception as e:
-            if str(e) == 'notrain':
-                failtrains.append(train)
-                continue
-            elif str(e) == 'connecterr':
-                tryagain.append(train)
-                continue
-            else:
-                print(e)
-                continue
-
-
-        trainNo = infos[0]
-
-        Trains.append(infos)
-        if i % 100 == 0:
-            print(i)
-        time.sleep(0.1)
-        i = i + 1
-
-        TNs.append(trainNo)
-
-        for stop in infos[1]:
-            # print('stop: ' + stop[0])
-            city = s2c(stop[0])
-            if city == 0:
-                odds.add(stop[0])
-                log.append(TMP)
-                print(trainNo + ' ' + stop[0])
-            else:
-                stations.add(city)
-
-        LEN = len(infos[1])
-
-        for ti in range(LEN - 2):
-            k1 = s2c(infos[1][ti][0])
-            k2 = s2c(infos[1][ti + 1][0])
-
-            start = infos[1][ti][2].split(':')
-            arrive = infos[1][ti + 1][2].split(':')
-            weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
-
-            if k1 == 0 or k2 == 0:
-                edgekey = infos[1][ti][0] + '-' + infos[1][ti + 1][0]
-                if edgekey in oddsPaths:
-                    oddsPaths[edgekey].append((weight, infos[0]))
+    try:
+        for train in listT:
+            try:
+                infos = crawlTrainInfo_gaotie(train)
+            except Exception as e:
+                if str(e) == 'notrain':
+                    failtrains.append(train)
+                    continue
+                elif str(e) == 'connecterr':
+                    tryagain.append(train)
+                    continue
                 else:
-                    oddsPaths[edgekey] = [(weight, infos[0])]
-            else:
-                edgekey = k1 + '-' + k2  # xx市-xx市
-                if edgekey in paths:
-                    paths[edgekey].append((weight, infos[0]))
+                    print(e)
+                    continue
+
+
+            trainNo = infos[0]
+
+            Trains.append(infos)
+            if i % 100 == 0:
+                print(i)
+            time.sleep(0.1)
+            i = i + 1
+
+            TNs.append(trainNo)
+
+            for stop in infos[1]:
+                # print('stop: ' + stop[0])
+                city = s2c(stop[0])
+                if city == 0:
+                    odds.add(stop[0])
+                    log.append(TMP)
+                    #print(trainNo + ' ' + stop[0])
                 else:
-                    paths[edgekey] = [(weight, infos[0])]
+                    stations.add(city)
+
+            LEN = len(infos[1])
+
+            for ti in range(LEN - 2):
+                k1 = s2c(infos[1][ti][0])
+                k2 = s2c(infos[1][ti + 1][0])
+
+                start = infos[1][ti][2].split(':')
+                arrive = infos[1][ti + 1][2].split(':')
+                weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
+
+                if k1 == 0 or k2 == 0:
+                    edgekey = infos[1][ti][0] + '-' + infos[1][ti + 1][0]
+                    if edgekey in oddsPaths:
+                        oddsPaths[edgekey].append((weight, infos[0]))
+                    else:
+                        oddsPaths[edgekey] = [(weight, infos[0])]
+                else:
+                    edgekey = k1 + '-' + k2  # xx市-xx市
+                    if edgekey in paths:
+                        paths[edgekey].append((weight, infos[0]))
+                    else:
+                        paths[edgekey] = [(weight, infos[0])]
+    except Exception as e:
+        print(e)
+        print(train)
 
     out = (list(stations), paths, list(odds), oddsPaths)
 
@@ -295,8 +300,9 @@ def main():
     initSC('oddstations.txt')
 
     getSch('Dshorter_list.txt', 'D')
+
+    #getSch('Gshorter_list.txt', 'G')
     print(newOS)
-    #gzgetSch('Gshorter_list.txt', 'G')
 
     #print(crawlTrainInfo_gaotie('D29'))
     #crawlTrainInfo()
