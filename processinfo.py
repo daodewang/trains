@@ -3,6 +3,7 @@ import networkx as nx
 from operator import itemgetter
 import matplotlib.pyplot as plt
 import requests
+from collections import Counter
 
 
 # 将上一步的到的paths转换为无向图的边
@@ -67,6 +68,7 @@ def loadinfo(injson):
 
 
 def main():
+    '''
     f = open('Dshorter_list.txt', 'r', encoding='utf-8')
     strJson = json.load(f)
     print(strJson)
@@ -77,11 +79,11 @@ def main():
     print(strJson)
     print(len(strJson))
     f.close()
-
     '''
 
     Dinfo = loadinfo('DNode_Edge.json')
     dstations = Dinfo[0]
+    print(len(dstations))
     print(dstations)
     Dpaths = Dinfo[1]
     print(len(Dpaths))
@@ -93,6 +95,7 @@ def main():
 
     Ginfo = loadinfo('GNode_Edge.json')
     gstations = Ginfo[0]
+    print(len(gstations))
     print(gstations)
     Gpaths = Ginfo[1]
     print(len(Gpaths))
@@ -112,10 +115,10 @@ def main():
     nodes = set(dstations) | set(gstations)
 
 
-    print(UDedges)
-    print(CBEdges)
-    print(TimeEdges)
-    print(len(nodes))
+    #print(UDedges)
+    #print(CBEdges)
+    #print(TimeEdges)
+    #print(len(nodes))
 
     G = nx.DiGraph()
     G.add_nodes_from(nodes)
@@ -123,8 +126,17 @@ def main():
 
     deg = G.degree()
     print(sorted(deg, key=lambda x: (x[1]), reverse=True))
+    ns = len(deg)
 
-    
+    degv = [x[1] for x in deg]
+    print(degv)
+    result = {}
+    for i in set(degv):
+        result[i] = degv.count(i)
+    print(result)
+
+
+    '''
     G = nx.DiGraph()
 
     stations, trains = getSandT()

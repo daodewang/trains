@@ -60,6 +60,45 @@ def get_train_info():
 TMP = 0
 
 
+# 去高铁网爬取指定车次时刻表
+def crawlTrainInfo_gaotie(trainNo='G1'):
+    url = f'http://shike.gaotie.cn/checi.asp?checi={trainNo}'
+    StopClass = collections.namedtuple('StopClass', ['name', 'stop', 'start'])
+    TrainClass = collections.namedtuple('TrainClass', ['train', 'stops'])
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+        r.encoding = "gbk"
+        global TMP
+        TMP = r.text
+
+        soup = BeautifulSoup(r.text.replace("\n", ""), 'html.parser')
+        tt = soup.find(text="站次")
+        biaotou = tt.parent.parent.parent
+        stops = []
+        for web in biaotou.next_siblings:
+            s = web.find_all('td')
+            name = s[1].contents[0].contents[0].text
+            start = s[2].text
+            stop = s[3].text
+            if start == '始发站':
+                start = stop
+            if stop == '终点站':
+                stop = start
+
+            station = StopClass(name, start, stop)
+            stops.append(station)
+
+        return TrainClass(trainNo, stops)
+    except Exception as e:
+        if str(e).startswith("'NoneType'"):
+            raise Exception('notrain')
+        elif str(e).startswith("'NavigableString'"):
+            raise Exception('connecterr')
+        else:
+            print(e)
+
+
 # 去携程爬取指定车次的时刻表
 def crawlTrainInfo(trainNo='G1'):
     baseurl = 'https://trains.ctrip.com/trainbooking/TrainSchedule/'
@@ -79,7 +118,7 @@ def crawlTrainInfo(trainNo='G1'):
         for e in tt:
             stop = e.parent.next_sibling.next_sibling
             start = stop.next_sibling.next_sibling
-            station = StopClass(e.string, stop.string.strip(), start.string.strip())
+            station = StopClass(e.string + '站', stop.string.strip(), start.string.strip())
             stops.append(station)
 
         return TrainClass(trainNo, stops)
@@ -89,6 +128,7 @@ def crawlTrainInfo(trainNo='G1'):
 
 # 避免重复查询，把已查记录存好
 SC = dict()
+newOS = set()
 
 
 # 将文件中的站-城映射保存到SC
@@ -104,8 +144,9 @@ def initSC(infile):
 
 # 将车站转换为所在的城市
 def s2c(station):
-    address = station + '站'
+    address = station
     global SC
+    global newOS
     if address in SC:
         return SC[address]
     else:
@@ -122,7 +163,7 @@ def s2c(station):
         else:
             city = info['geocodes'][0]['city']
             if city == []:
-                print(station)
+                newOS.add(city)
                 SC[address] = 0
                 return 0
             else:
@@ -137,7 +178,7 @@ def s2c(station):
 # 节点用集合stations表示
 # 每条边用一个字典元素表示，键名为“某站-某站”，值为一个列表，列表元素为（时间，车次）
 # 在高德地图上查不到所在城市的车站和关联的边保存至odds和oddsPaths
-def getSch(inshorter, type='D'):
+def getSch(inshorter, type='D', jixu=0):
     f = open(inshorter, 'r', encoding='utf-8')
     strJson = json.load(f)
     listT = [e['station_train_code'] for e in strJson]
@@ -145,18 +186,49 @@ def getSch(inshorter, type='D'):
     f.close()
 
     log = []
-
-    Trains = []
-
     TNs = []
-    stations = set()  # xx市
-    paths = dict()
-    odds = set()
-    oddsPaths = dict()
+    failtrains = []
+    tryagain = []
+
+    if jixu == 0:
+        Trains = []
+        stations = set()  # xx市
+        paths = dict()
+        odds = set()
+        oddsPaths = dict()
+    else:
+        with open(type + 'Node_Edge_gtw.json', 'r', encoding='utf-8') as f:
+            out = json.load(f)
+            stations = set(out[0])
+            paths = out[1]
+            odds = set(out[2])
+            oddsPaths = out[3]
+
+        with open(type + 'train_infos_gtw.json', 'r', encoding='utf-8') as ff:
+            Trains = json.load(ff)
+
+        pos = listT.index(jixu)
+        listT = listT[pos:-1]
+        print(listT)
+
     i = 0
     for train in listT:
-        infos = crawlTrainInfo(train)
+        try:
+            infos = crawlTrainInfo_gaotie(train)
+        except Exception as e:
+            if str(e) == 'notrain':
+                failtrains.append(train)
+                continue
+            elif str(e) == 'connecterr':
+                tryagain.append(train)
+                continue
+            else:
+                print(e)
+                continue
+
+
         trainNo = infos[0]
+
         Trains.append(infos)
         if i % 100 == 0:
             print(i)
@@ -200,19 +272,22 @@ def getSch(inshorter, type='D'):
 
     out = (list(stations), paths, list(odds), oddsPaths)
 
-    with open(type + 'train_infos.json', 'w', encoding='utf-8') as ft:
+    with open(type + 'train_infos_gtw.json', 'w', encoding='utf-8') as ft:
         ft.write(json.dumps(Trains))
 
-    with open(type + 'Node_Edge.json', 'w', encoding='utf-8') as fn:
+    with open(type + 'Node_Edge_gtw.json', 'w', encoding='utf-8') as fn:
         fn.write(json.dumps(out))
+
+    with open(type + 'crawl_fail.json', 'w', encoding='utf-8') as ff:
+        ff.write(json.dumps((failtrains, tryagain)))
 
 
 def main():
     # 下载需要的文件
-    tn_data_url = 'https://kyfw.12306.cn/otn/resources/js/query/train_list.js?scriptVersion=1.0'
+    #tn_data_url = 'https://kyfw.12306.cn/otn/resources/js/query/train_list.js?scriptVersion=1.0'
     #download_data(tn_data_url, 'tnumber_datas.txt')
 
-    station_data_url = 'https://kyfw.12306.cn/otn/resources/js/framework/station_name.js?station_version=1.9002'
+    #station_data_url = 'https://kyfw.12306.cn/otn/resources/js/framework/station_name.js?station_version=1.9002'
     #download_data(station_data_url, 'stations_datas.txt')
 
     #get_train_info()
@@ -220,7 +295,14 @@ def main():
     initSC('oddstations.txt')
 
     getSch('Dshorter_list.txt', 'D')
+    print(newOS)
     #gzgetSch('Gshorter_list.txt', 'G')
+
+    #print(crawlTrainInfo_gaotie('D29'))
+    #crawlTrainInfo()
+    '''
+    D617,D620,D707,D708,D765
+    '''
 
 
 if __name__ == "__main__":
