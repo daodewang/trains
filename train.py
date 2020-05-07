@@ -100,7 +100,7 @@ def crawlTrainInfo_gaotie(trainNo='G1'):
 
 
 # 去携程爬取指定车次的时刻表
-def crawlTrainInfo(trainNo='G1'):
+def crawlTrainInfo_xc(trainNo='G1'):
     baseurl = 'https://trains.ctrip.com/trainbooking/TrainSchedule/'
     StopClass = collections.namedtuple('StopClass', ['name', 'stop', 'start'])
     TrainClass = collections.namedtuple('TrainClass', ['train', 'stops'])
@@ -134,7 +134,7 @@ newOS = set()
 # 将文件中的站-城映射保存到SC
 def initSC(infile):
     for line in open(infile, 'r', encoding='utf-8'):
-        print(line)
+        #print(line)
         mapping = line.split('-')
         s = mapping[0]
         c = mapping[1].strip('\n')
@@ -183,7 +183,7 @@ def getSch(inshorter, type='D', jixu=0):
     f = open(inshorter, 'r', encoding='utf-8')
     strJson = json.load(f)
     listT = [e['station_train_code'] for e in strJson]
-    #print(len(listT), listT)
+    print(len(listT), listT)
     f.close()
 
     log = []
@@ -215,6 +215,8 @@ def getSch(inshorter, type='D', jixu=0):
     i = 0
     try:
         for train in listT:
+            #print(Trains)
+            #print(paths)
             try:
                 infos = crawlTrainInfo_gaotie(train)
             except Exception as e:
@@ -277,6 +279,9 @@ def getSch(inshorter, type='D', jixu=0):
 
     out = (list(stations), paths, list(odds), oddsPaths)
 
+    print(Trains)
+    print(paths)
+
     with open(type + 'train_infos_gtw.json', 'w', encoding='utf-8') as ft:
         ft.write(json.dumps(Trains))
 
@@ -284,6 +289,119 @@ def getSch(inshorter, type='D', jixu=0):
         fn.write(json.dumps(out))
 
     with open(type + 'crawl_fail.json', 'w', encoding='utf-8') as ff:
+        ff.write(json.dumps((failtrains, tryagain)))
+
+
+# 从携程补充一些时刻表
+def getSch_xc(type='D', jixu=0):
+    with open(type + 'crawl_fail.json', 'r', encoding='utf-8') as f:
+        strJson = json.load(f)
+
+        listT = strJson[0]
+        listT.extend(strJson[1])
+        print(len(listT), listT)
+
+
+    log = []
+    TNs = []
+    failtrains = []
+    tryagain = []
+
+    if jixu == 0:
+        Trains = []
+        stations = set()  # xx市
+        paths = dict()
+        odds = set()
+        oddsPaths = dict()
+    else:
+        with open(type + 'Node_Edge_xc.json', 'r', encoding='utf-8') as f:
+            out = json.load(f)
+            stations = set(out[0])
+            paths = out[1]
+            odds = set(out[2])
+            oddsPaths = out[3]
+
+        with open(type + 'train_infos_xc.json', 'r', encoding='utf-8') as ff:
+            Trains = json.load(ff)
+
+        pos = listT.index(jixu)
+        listT = listT[pos:-1]
+        print(listT)
+
+    i = 0
+    try:
+        for train in listT:
+            try:
+                infos = crawlTrainInfo_xc(train)
+            except Exception as e:
+                if str(e) == 'notrain':
+                    failtrains.append(train)
+                    continue
+                elif str(e) == 'connecterr':
+                    tryagain.append(train)
+                    continue
+                else:
+                    print(e)
+                    print(train)
+                    continue
+
+
+            trainNo = infos[0]
+
+            Trains.append(infos)
+            if i % 100 == 0:
+                print(i)
+            time.sleep(0.1)
+            i = i + 1
+
+            TNs.append(trainNo)
+
+            for stop in infos[1]:
+                # print('stop: ' + stop[0])
+                city = s2c(stop[0])
+                if city == 0:
+                    odds.add(stop[0])
+                    log.append(TMP)
+                    #print(trainNo + ' ' + stop[0])
+                else:
+                    stations.add(city)
+
+            LEN = len(infos[1])
+
+            for ti in range(LEN - 2):
+                k1 = s2c(infos[1][ti][0])
+                k2 = s2c(infos[1][ti + 1][0])
+
+                start = infos[1][ti][2].split(':')
+                arrive = infos[1][ti + 1][2].split(':')
+                weight = 60 * (int(arrive[0]) - int(start[0])) + (int(arrive[1]) - int(start[1]))
+
+                if k1 == 0 or k2 == 0:
+                    edgekey = infos[1][ti][0] + '-' + infos[1][ti + 1][0]
+                    if edgekey in oddsPaths:
+                        oddsPaths[edgekey].append((weight, infos[0]))
+                    else:
+                        oddsPaths[edgekey] = [(weight, infos[0])]
+                else:
+                    edgekey = k1 + '-' + k2  # xx市-xx市
+                    if edgekey in paths:
+                        paths[edgekey].append((weight, infos[0]))
+                    else:
+                        paths[edgekey] = [(weight, infos[0])]
+
+    except Exception as e:
+        print(e)
+        print(train)
+
+    out = (list(stations), paths, list(odds), oddsPaths)
+
+    with open(type + 'train_infos_xc.json', 'w', encoding='utf-8') as ft:
+        ft.write(json.dumps(Trains))
+
+    with open(type + 'Node_Edge_xc.json', 'w', encoding='utf-8') as fn:
+        fn.write(json.dumps(out))
+
+    with open(type + 'crawl_fail_xc.json', 'w', encoding='utf-8') as ff:
         ff.write(json.dumps((failtrains, tryagain)))
 
 
@@ -299,7 +417,8 @@ def main():
 
     initSC('oddstations.txt')
 
-    getSch('Dshorter_list.txt', 'D')
+    #getSch('Dshorter_list.txt', 'D')
+    getSch_xc('G')
 
     #getSch('Gshorter_list.txt', 'G')
     print(newOS)
