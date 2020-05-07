@@ -1,5 +1,7 @@
 import json
 import networkx as nx
+import numpy as np
+import matplotlib.pyplot as plt
 from operator import itemgetter
 import matplotlib.pyplot as plt
 import requests
@@ -28,6 +30,10 @@ def getTimeEdges(paths):
     edges = []
     for k, v in paths.items():
         tl = [e[0] for e in v]
+        for i in range(len(tl)):
+            if tl[i] <= 0:
+                tl[i] = tl[i] + 1440
+
         weight = int(sum(tl)/len(v))
         nodes = k.split('-')
         edges.append((nodes[0], nodes[1], {'time': weight}))
@@ -43,6 +49,20 @@ def popdict(dict):
 
     for path in list:
         dict.pop(path)
+
+
+def dopaths(nefile):
+    Dinfo = loadinfo(nefile)
+    stations = Dinfo[0]
+    #print(len(stations))
+    #print(f"contains {len(stations)} stations: {stations}")
+
+    Dpaths = Dinfo[1]
+    l = len(Dpaths)
+    popdict(Dpaths)
+    #print(f"paths len: {l}, quchonghou: {len(Dpaths)}")
+
+    return stations, Dpaths
 
 
 # 把动车，高铁的边集合并
@@ -68,74 +88,164 @@ def loadinfo(injson):
 
 
 def main():
-    '''
-    f = open('Dshorter_list.txt', 'r', encoding='utf-8')
-    strJson = json.load(f)
-    print(strJson)
-    print(len(strJson))
-    f.close()
-    f = open('Gshorter_list.txt', 'r', encoding='utf-8')
-    strJson = json.load(f)
-    print(strJson)
-    print(len(strJson))
-    f.close()
-    '''
+    ds_gtw, dpaths_gtw = dopaths('DNode_Edge_gtw.json')
+    gs_gtw, gpaths_gtw = dopaths('GNode_Edge_gtw.json')
+    ds_xc, dpaths_xc = dopaths('DNode_Edge_xc.json')
+    gs_xc, gpaths_xc = dopaths('GNode_Edge_xc.json')
 
-    Dinfo = loadinfo('DNode_Edge.json')
-    dstations = Dinfo[0]
-    print(len(dstations))
-    print(dstations)
-    Dpaths = Dinfo[1]
-    print(len(Dpaths))
+    p1 = mergedges(dpaths_gtw, gpaths_gtw)
+    p2 = mergedges(p1, dpaths_xc)
+    allpaths = mergedges(p2, gpaths_xc)
 
-    popdict(Dpaths)
-    print(len(Dpaths))
+    print(f"边总共有{len(allpaths)}条:")
+    #print(allpaths)
 
-    #print(Dpaths)
+    UDedges = getUDEdges(allpaths)
+    CBEdges = getCBEdges(allpaths)
+    TimeEdges = getTimeEdges(allpaths)
+    nodes = set(ds_gtw) | set(gs_gtw) | set(ds_xc) | set(gs_xc)
+    print(f"聚合后城市有{len(nodes)}个:")
+    # print(nodes)
 
-    Ginfo = loadinfo('GNode_Edge.json')
-    gstations = Ginfo[0]
-    print(len(gstations))
-    print(gstations)
-    Gpaths = Ginfo[1]
-    print(len(Gpaths))
+    ###############################################
+    # 简单无向图模型
+    print('------简单无向图----------------------------')
 
-    popdict(Gpaths)
-    print(len(Dpaths))
-
-    #print(Gpaths)
-
-    paths = mergedges(Dpaths, Gpaths)
-    print(len(paths))
-    print(paths)
-
-    UDedges = getUDEdges(paths)
-    CBEdges = getCBEdges(paths)
-    TimeEdges = getTimeEdges(paths)
-    nodes = set(dstations) | set(gstations)
-
-
-    #print(UDedges)
-    #print(CBEdges)
-    #print(TimeEdges)
-    #print(len(nodes))
-
-    G = nx.DiGraph()
+    G = nx.Graph()
     G.add_nodes_from(nodes)
     G.add_edges_from(UDedges)
 
+    print('--点度数-----')
     deg = G.degree()
-    print(sorted(deg, key=lambda x: (x[1]), reverse=True))
+    sdeg = sorted(deg, key=lambda x: (x[1]), reverse=True)
+    print(sdeg)
     ns = len(deg)
 
-    degv = [x[1] for x in deg]
+    degv = [x[1] for x in sdeg]
     print(degv)
-    result = {}
-    for i in set(degv):
+    maxdeg = max(degv)
+    result = list(range(maxdeg+1))
+    print(len(result))
+    for i in range(maxdeg+1):
         result[i] = degv.count(i)
     print(result)
 
+    # 幂律处理
+    j = 1
+    tmp = 0
+    mi = list(range(6))
+    for i in range(maxdeg):
+        if i <= 2**j:
+            tmp += result[i]
+        else:
+            mi[j-1] = tmp
+            j += 1
+            tmp = result[i]
 
+    print(mi)
+    x = [2**(i+1) for i in range(6)]
+    plt.semilogx(x, mi)
+    plt.show()
+
+    # 点介数
+    print('--点介数-----')
+    betweenness = nx.algorithms.centrality.betweenness_centrality(G, endpoints=True)
+    sbetweenness = sorted(betweenness.items(), key=lambda x: (x[1]), reverse=True)
+    print(sbetweenness)
+    x = [k[1] for k in sbetweenness]
+    plt.plot(x)
+    plt.show()
+
+    asp = nx.algorithms.shortest_paths.generic.average_shortest_path_length(G)
+    print(f'--平均最短路径长度为: {asp}')
+
+    print('--聚类系数-----')
+    clu = nx.algorithms.cluster.clustering(G, weight='time')
+    sclu = sorted(clu.items(), key=lambda y: (y[1]), reverse=False)
+    print(sclu)
+    x = [k[1] for k in sclu]
+    plt.plot(x)
+    plt.show()
+    ''''''
+
+    ###############################################
+    # 考虑重边模型
+    '''
+    G = nx.Graph()
+    G.add_nodes_from(nodes)
+    G.add_edges_from(CBEdges)
+
+    deg = G.degree(weight='no')
+    sdeg = sorted(deg, key=lambda x: (x[1]), reverse=True)
+    print(sdeg)
+    ns = len(deg)
+
+    degv = [x[1] for x in sdeg]
+    print(degv)
+    maxdeg = max(degv)
+    result = list(range(maxdeg + 1))
+    print(len(result))
+    for i in range(maxdeg + 1):
+        result[i] = degv.count(i)
+    print(result)
+
+    # 幂律处理
+    j = 1
+    tmp = 0
+    mi = list(range(10))
+    for i in range(maxdeg):
+        if i <= 2 ** j:
+            tmp += result[i]
+        else:
+            mi[j - 1] = tmp
+            j += 1
+            tmp = result[i]
+
+    x = [2 ** (i + 1) for i in range(10)]
+    plt.semilogx(x, mi)
+    plt.show()
+
+    # 累积概率分布
+    leiji = list(range(maxdeg + 1))
+    fenmu = sum(result)
+    for i in range(maxdeg + 1):
+        leiji[i] = sum(result[i:-1])/fenmu
+
+    plt.semilogx(leiji)
+    plt.show()
+    
+    
+    '''
+    #############################################
+    # 时间赋权图
+    print('------时间赋权图----------------------------')
+    G = nx.Graph()
+    G.add_nodes_from(nodes)
+    G.add_edges_from(TimeEdges)
+
+    # 点介数
+    print('--点介数-----')
+    betweenness = nx.algorithms.centrality.betweenness_centrality(G, weight='time', endpoints=True)
+    sbetweenness = sorted(betweenness.items(), key=lambda y: (y[1]), reverse=True)
+    print(sbetweenness)
+    x = [k[1] for k in sbetweenness]
+    plt.plot(x)
+    plt.show()
+
+    asp = nx.algorithms.shortest_paths.generic.average_shortest_path_length(G, weight='time')
+    print(f'--平均最短路径长度为: {asp}')
+
+    print('--聚类系数-----')
+    clu = nx.algorithms.cluster.clustering(G, weight='time')
+    sclu = sorted(clu.items(), key=lambda y: (y[1]), reverse=False)
+    print(sclu)
+    x = [k[1] for k in sclu]
+    plt.plot(x)
+    plt.show()
+    ''''''
+
+
+    # 其他
     '''
     G = nx.DiGraph()
 

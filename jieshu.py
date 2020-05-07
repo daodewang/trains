@@ -1,7 +1,7 @@
 import networkx as nx
 import requests
 
-'''
+
 def jisuan(n, m):
     G = nx.generators.random_graphs.gnm_random_graph(n, m)
     betweenness = nx.algorithms.centrality.betweenness_centrality(G, endpoints=True)
@@ -15,6 +15,7 @@ def jisuan(n, m):
 
 for i in range(10):
     jisuan(30, 400)
+
 '''
 
 
@@ -30,4 +31,4 @@ if d["count"] == '0':  # 未查到该车站
 else:
     city = d['geocodes'][0]['city']
     print(city)
-
+'''

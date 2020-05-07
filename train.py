@@ -415,16 +415,17 @@ def main():
 
     #get_train_info()
 
-    initSC('oddstations.txt')
+    #initSC('oddstations.txt')
 
     #getSch('Dshorter_list.txt', 'D')
-    getSch_xc('G')
+    #getSch_xc('G')
 
     #getSch('Gshorter_list.txt', 'G')
-    print(newOS)
+    #print(newOS)
 
     #print(crawlTrainInfo_gaotie('D29'))
     #crawlTrainInfo()
+    print([1, 2, 2].count(2))
     '''
     D617,D620,D707,D708,D765
     '''
