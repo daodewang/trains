@@ -2,11 +2,7 @@ import json
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-from operator import itemgetter
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import requests
-from collections import Counter
+from pandas import DataFrame
 
 
 # 将上一步的到的paths转换为无向图的边
@@ -103,9 +99,19 @@ def analysisgraph(model, nodes, edges, gweight=None):
     sdeg = sorted(deg, key=lambda x: (x[1]), reverse=True)
     print(sdeg)
     ns = len(deg)
-
     sdegv = [x[1] for x in sdeg]
+
     print(f'平均点度数{np.mean(sdegv)}')
+
+    data = {
+        '城市': [e[0] for e in sdeg],
+        '点度数': [e[1] for e in sdeg],
+        '平均点度数': np.mean(sdegv)
+    }
+    df = DataFrame(data)
+    df.to_excel(f'{model}-degree.xlsx')
+
+
     maxdeg = max(sdegv)
     result = list(range(maxdeg+1))
     #print(len(result))
@@ -149,13 +155,22 @@ def analysisgraph(model, nodes, edges, gweight=None):
     plt.show()
     # ax.xaxis.set_major_formatter(ticker.FuncFormatter(log2))
 
-    # 点介数散点分布图
     print('--点介数-----')
+    # 点介数散点分布图
     betweenness = nx.algorithms.centrality.betweenness_centrality(G, weight=gweight, endpoints=True)
     sbetweenness = sorted(betweenness.items(), key=lambda x: (x[1]), reverse=True)
     print(sbetweenness)
     x = [k[1] for k in sbetweenness]
     print(f'平均点介数{np.mean(x)}')
+
+    data = {
+        '城市': [e[0] for e in sbetweenness],
+        '点介数': [e[1] for e in sbetweenness],
+        '平均点介数': np.mean(x)
+    }
+    df = DataFrame(data)
+    df.to_excel(f'{model}-betweenness.xlsx')
+
     plt.xlabel('Citys')
     plt.ylabel('Betweenness')
     plt.title(f'Betweenness centrality of {model}')
@@ -165,13 +180,29 @@ def analysisgraph(model, nodes, edges, gweight=None):
     plt.savefig(f'{model}-betweenness.eps')
     plt.show()
 
-    # 聚类系数散点分布图
+    print('--最短路径-----')
+    # 平均最短路径
+    asp = nx.algorithms.shortest_paths.generic.average_shortest_path_length(G, weight=gweight)
+    print(f'--平均最短路径长度为: {asp}')
+
+
     print('--聚类系数-----')
+    # 聚类系数散点分布图
     clu = nx.algorithms.cluster.clustering(G, weight=gweight)
     sclu = sorted(clu.items(), key=lambda y: (y[1]), reverse=True)
     print(sclu)
     x = [k[1] for k in sclu]
     print(f'平均聚类系数{np.mean(x)}')
+
+    data = {
+        '城市': [e[0] for e in sclu],
+        '点聚类系数': [e[1] for e in sclu],
+        '平均点聚类系数': np.mean(x),
+        '平均最短距离长度': asp
+    }
+    df = DataFrame(data)
+    df.to_excel(f'{model}-cluster.xlsx')
+
     plt.xlabel('Citys')
     plt.ylabel('Clustering coefficient')
     plt.title(f'Clustering coefficient of {model}')
@@ -180,11 +211,6 @@ def analysisgraph(model, nodes, edges, gweight=None):
     plt.savefig(f'{model}-cluster.png')
     plt.savefig(f'{model}-cluster.eps')
     plt.show()
-
-    # 平均最短路径
-    print('--最短路径-----')
-    asp = nx.algorithms.shortest_paths.generic.average_shortest_path_length(G, weight=gweight)
-    print(f'--平均最短路径长度为: {asp}')
 
 
 def main():
