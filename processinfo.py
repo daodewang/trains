@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from operator import itemgetter
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import requests
 from collections import Counter
 
@@ -87,6 +88,105 @@ def loadinfo(injson):
         return dinfo
 
 
+def log2(x, pos):
+    'The two args are the value and tick position'
+    return f'{2**x}'
+
+
+def analysisgraph(model, nodes, edges, gweight=None):
+    G = nx.Graph()
+    G.add_nodes_from(nodes)
+    G.add_edges_from(edges)
+
+    print('--点度数-----')
+    deg = G.degree(weight=gweight)
+    sdeg = sorted(deg, key=lambda x: (x[1]), reverse=True)
+    print(sdeg)
+    ns = len(deg)
+
+    sdegv = [x[1] for x in sdeg]
+    print(f'平均点度数{np.mean(sdegv)}')
+    maxdeg = max(sdegv)
+    result = list(range(maxdeg+1))
+    #print(len(result))
+    for i in range(maxdeg+1):
+        result[i] = sdegv.count(i)
+    print(result)
+
+    # 点度数归一化累积分布柱状图
+    leiji = list(range(maxdeg + 1))
+    fenmu = sum(result)
+    for i in range(maxdeg + 1):
+        leiji[i] = sum(result[i:-1]) / fenmu
+
+    print(leiji)
+
+    plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+    plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
+
+    plt.xlabel('Degree')
+    plt.ylabel('Cumulative probability')
+    plt.title(f'Cumulative probability distribution of {model}')
+    plt.bar(range(1, len(leiji)+1), leiji)
+
+    plt.savefig(f'{model}-degree.png')
+    plt.savefig(f'{model}-degree.eps')
+    plt.show()
+
+    #
+    # 点度数归一化累积分布柱状图-对数坐标
+    plt.xlabel('Degree')
+    plt.ylabel('Cumulative probability')
+    plt.title(f'Cumulative probability distribution of {model}')
+    log_leiji = list(range(5))
+    for i in range(5):
+        log_leiji[i] = leiji[2**i]
+    plt.xticks([1, 2, 3, 4, 5], ['1', '2', '4', '8', '16'])
+    plt.bar(range(1, len(log_leiji) + 1), log_leiji)
+
+    plt.savefig(f'{model}-degree-log.png')
+    plt.savefig(f'{model}-degree-log.eps')
+    plt.show()
+    # ax.xaxis.set_major_formatter(ticker.FuncFormatter(log2))
+
+    # 点介数散点分布图
+    print('--点介数-----')
+    betweenness = nx.algorithms.centrality.betweenness_centrality(G, weight=gweight, endpoints=True)
+    sbetweenness = sorted(betweenness.items(), key=lambda x: (x[1]), reverse=True)
+    print(sbetweenness)
+    x = [k[1] for k in sbetweenness]
+    print(f'平均点介数{np.mean(x)}')
+    plt.xlabel('Citys')
+    plt.ylabel('Betweenness')
+    plt.title(f'Betweenness centrality of {model}')
+    plt.scatter(range(len(x)), x, 1)
+
+    plt.savefig(f'{model}-betweenness.png')
+    plt.savefig(f'{model}-betweenness.eps')
+    plt.show()
+
+    # 聚类系数散点分布图
+    print('--聚类系数-----')
+    clu = nx.algorithms.cluster.clustering(G, weight=gweight)
+    sclu = sorted(clu.items(), key=lambda y: (y[1]), reverse=True)
+    print(sclu)
+    x = [k[1] for k in sclu]
+    print(f'平均聚类系数{np.mean(x)}')
+    plt.xlabel('Citys')
+    plt.ylabel('Clustering coefficient')
+    plt.title(f'Clustering coefficient of {model}')
+    plt.scatter(range(len(x)), x, 1)
+
+    plt.savefig(f'{model}-cluster.png')
+    plt.savefig(f'{model}-cluster.eps')
+    plt.show()
+
+    # 平均最短路径
+    print('--最短路径-----')
+    asp = nx.algorithms.shortest_paths.generic.average_shortest_path_length(G, weight=gweight)
+    print(f'--平均最短路径长度为: {asp}')
+
+
 def main():
     ds_gtw, dpaths_gtw = dopaths('DNode_Edge_gtw.json')
     gs_gtw, gpaths_gtw = dopaths('GNode_Edge_gtw.json')
@@ -97,79 +197,25 @@ def main():
     p2 = mergedges(p1, dpaths_xc)
     allpaths = mergedges(p2, gpaths_xc)
 
-    print(f"边总共有{len(allpaths)}条:")
-    #print(allpaths)
-
-    UDedges = getUDEdges(allpaths)
+    UDEdges = getUDEdges(allpaths)
     CBEdges = getCBEdges(allpaths)
     TimeEdges = getTimeEdges(allpaths)
     nodes = set(ds_gtw) | set(gs_gtw) | set(ds_xc) | set(gs_xc)
-    print(f"聚合后城市有{len(nodes)}个:")
+    print(f"无向{len(allpaths)}条, 聚合后城市有{len(nodes)}个")
     # print(nodes)
 
-    ###############################################
     # 简单无向图模型
     print('------简单无向图----------------------------')
+    analysisgraph('undirected graph', nodes, UDEdges)
 
-    G = nx.Graph()
-    G.add_nodes_from(nodes)
-    G.add_edges_from(UDedges)
+    # 重边权重图模型
+    print('------重边权重图----------------------------')
+    analysisgraph('CB-weighted graph', nodes, CBEdges, gweight='no')
 
-    print('--点度数-----')
-    deg = G.degree()
-    sdeg = sorted(deg, key=lambda x: (x[1]), reverse=True)
-    print(sdeg)
-    ns = len(deg)
+    # 时间权重图模型
+    print('------时间权重图----------------------------')
+    analysisgraph('time-weighted graph', nodes, CBEdges, gweight='time')
 
-    degv = [x[1] for x in sdeg]
-    print(degv)
-    maxdeg = max(degv)
-    result = list(range(maxdeg+1))
-    print(len(result))
-    for i in range(maxdeg+1):
-        result[i] = degv.count(i)
-    print(result)
-
-    # 幂律处理
-    j = 1
-    tmp = 0
-    mi = list(range(6))
-    for i in range(maxdeg):
-        if i <= 2**j:
-            tmp += result[i]
-        else:
-            mi[j-1] = tmp
-            j += 1
-            tmp = result[i]
-
-    print(mi)
-    x = [2**(i+1) for i in range(6)]
-    plt.semilogx(x, mi)
-    plt.show()
-
-    # 点介数
-    print('--点介数-----')
-    betweenness = nx.algorithms.centrality.betweenness_centrality(G, endpoints=True)
-    sbetweenness = sorted(betweenness.items(), key=lambda x: (x[1]), reverse=True)
-    print(sbetweenness)
-    x = [k[1] for k in sbetweenness]
-    plt.plot(x)
-    plt.show()
-
-    asp = nx.algorithms.shortest_paths.generic.average_shortest_path_length(G)
-    print(f'--平均最短路径长度为: {asp}')
-
-    print('--聚类系数-----')
-    clu = nx.algorithms.cluster.clustering(G, weight='time')
-    sclu = sorted(clu.items(), key=lambda y: (y[1]), reverse=False)
-    print(sclu)
-    x = [k[1] for k in sclu]
-    plt.plot(x)
-    plt.show()
-    ''''''
-
-    ###############################################
-    # 考虑重边模型
     '''
     G = nx.Graph()
     G.add_nodes_from(nodes)
@@ -211,11 +257,15 @@ def main():
     for i in range(maxdeg + 1):
         leiji[i] = sum(result[i:-1])/fenmu
 
-    plt.semilogx(leiji)
+    plt.loglog(leiji)
     plt.show()
+
+    parts = nx.algorithms.community.asyn_fluid.asyn_fluidc(G, 10)
+    for e in parts:
+        print(e)
     
     
-    '''
+
     #############################################
     # 时间赋权图
     print('------时间赋权图----------------------------')
@@ -242,11 +292,7 @@ def main():
     x = [k[1] for k in sclu]
     plt.plot(x)
     plt.show()
-    ''''''
-
-
-    # 其他
-    '''
+    
     G = nx.DiGraph()
 
     stations, trains = getSandT()
