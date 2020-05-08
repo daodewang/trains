@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas import DataFrame
+import powerlaw
 
 
 # 将上一步的到的paths转换为无向图的边
@@ -229,6 +230,7 @@ def main():
     nodes = set(ds_gtw) | set(gs_gtw) | set(ds_xc) | set(gs_xc)
     print(f"无向{len(allpaths)}条, 聚合后城市有{len(nodes)}个")
     # print(nodes)
+    '''
 
     # 简单无向图模型
     print('------简单无向图----------------------------')
@@ -247,13 +249,29 @@ def main():
     G.add_nodes_from(nodes)
     G.add_edges_from(CBEdges)
 
-    deg = G.degree(weight='no')
-    sdeg = sorted(deg, key=lambda x: (x[1]), reverse=True)
+    deg = nx.algorithms.centrality.betweenness_centrality(G, weight='no', endpoints=True)
+    sdeg = sorted(deg.items(), key=lambda x: (x[1]), reverse=True)
+    print(deg)
     print(sdeg)
     ns = len(deg)
 
     degv = [x[1] for x in sdeg]
+    y = [deg[x] for x in deg]
     print(degv)
+
+    data = np.array(degv)  # data can be list or numpy array
+    results = powerlaw.Fit(data)
+    print(results.power_law.alpha)
+    print(results.power_law.xmin)
+    R, p = results.distribution_compare('power_law', 'lognormal')
+
+    data = np.array(y)  # data can be list or numpy array
+    results = powerlaw.Fit(data)
+    print(results.power_law.alpha)
+    print(results.power_law.xmin)
+    R, p = results.distribution_compare('power_law', 'lognormal')
+
+    '''
     maxdeg = max(degv)
     result = list(range(maxdeg + 1))
     print(len(result))
