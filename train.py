@@ -405,6 +405,19 @@ def getSch_xc(type='D', jixu=0):
         ff.write(json.dumps((failtrains, tryagain)))
 
 
+def tj_station():
+    files = ['Dtrain_infos_gtw.json', 'Gtrain_infos_gtw.json', 'Dtrain_infos_xc.json', 'Gtrain_infos_xc.json']
+    stations = set()
+    for file in files:
+        with open(file, 'r', encoding='utf-8') as f:
+            trains = json.load(f)
+            for train in trains:
+                for stop in train[1]:
+                    stations.add(stop[0])
+    print(f'there are {len(stations)} stations')
+    print(stations)
+
+
 def main():
     # 下载需要的文件
     #tn_data_url = 'https://kyfw.12306.cn/otn/resources/js/query/train_list.js?scriptVersion=1.0'
@@ -425,7 +438,8 @@ def main():
 
     #print(crawlTrainInfo_gaotie('D29'))
     #crawlTrainInfo()
-    print([1, 2, 2].count(2))
+    #print([1, 2, 2].count(2))
+    tj_station()
     '''
     D617,D620,D707,D708,D765
     '''
