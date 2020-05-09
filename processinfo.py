@@ -95,6 +95,9 @@ def analysisgraph(model, nodes, edges, gweight=None):
     G.add_nodes_from(nodes)
     G.add_edges_from(edges)
 
+    plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+    plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
+
     print('--点度数-----')
     deg = G.degree(weight=gweight)
     sdeg = sorted(deg, key=lambda x: (x[1]), reverse=True)
@@ -104,13 +107,39 @@ def analysisgraph(model, nodes, edges, gweight=None):
 
     print(f'平均点度数{np.mean(sdegv)}')
 
+    # 幂律参数拟合
+    data = np.array(sdegv)  # data can be list or numpy array
+    results1 = powerlaw.Fit(data)
+    print(f'Tatal fit>>> alpha: {results1.power_law.alpha}, xmin: {results1.power_law.xmin}')
+    # R, p = results.distribution_compare('power_law', 'lognormal')
+
+    data = np.array(sdegv[0:-50])  # data can be list or numpy array
+    results2 = powerlaw.Fit(data)
+    print(f'Tail fit>>> alpha: {results2.power_law.alpha}, xmin: {results2.power_law.xmin}')
+    # R, p = results.distribution_compare('power_law', 'lognormal')
+
     data = {
         '城市': [e[0] for e in sdeg],
         '点度数': [e[1] for e in sdeg],
-        '平均点度数': np.mean(sdegv)
+        '平均点度数': np.mean(sdegv),
+        'alpha_total': results1.alpha,
+        'xmin_total': results1.xmin,
+        'alpha_tail': results2.alpha,
+        'xmin_tail': results2.xmin,
     }
     df = DataFrame(data)
     df.to_excel(f'{model}-degree.xlsx')
+
+
+
+    # 点度数散点图
+    plt.xlabel('City')
+    plt.ylabel('Degree')
+    plt.scatter(range(len(sdegv)), sdegv, 1)
+
+    plt.savefig(f'{model}-degree-scatter.png')
+    plt.savefig(f'{model}-degree-scatter.eps')
+    plt.show()
 
 
     maxdeg = max(sdegv)
@@ -128,12 +157,9 @@ def analysisgraph(model, nodes, edges, gweight=None):
 
     print(leiji)
 
-    plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
-    plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
-
     plt.xlabel('Degree')
     plt.ylabel('Cumulative probability')
-    plt.title(f'Cumulative probability distribution of {model}')
+    #plt.title(f'Cumulative probability distribution of {model}')
     plt.bar(range(1, len(leiji)+1), leiji)
 
     plt.savefig(f'{model}-degree.png')
@@ -144,7 +170,7 @@ def analysisgraph(model, nodes, edges, gweight=None):
     # 点度数归一化累积分布柱状图-对数坐标
     plt.xlabel('Degree')
     plt.ylabel('Cumulative probability')
-    plt.title(f'Cumulative probability distribution of {model}')
+    #plt.title(f'Cumulative probability distribution of {model}')
     log_leiji = list(range(5))
     for i in range(5):
         log_leiji[i] = leiji[2**i]
@@ -154,7 +180,6 @@ def analysisgraph(model, nodes, edges, gweight=None):
     plt.savefig(f'{model}-degree-log.png')
     plt.savefig(f'{model}-degree-log.eps')
     plt.show()
-    # ax.xaxis.set_major_formatter(ticker.FuncFormatter(log2))
 
     print('--点介数-----')
     # 点介数散点分布图
@@ -172,9 +197,9 @@ def analysisgraph(model, nodes, edges, gweight=None):
     df = DataFrame(data)
     df.to_excel(f'{model}-betweenness.xlsx')
 
-    plt.xlabel('Citys')
+    plt.xlabel('City')
     plt.ylabel('Betweenness')
-    plt.title(f'Betweenness centrality of {model}')
+    #plt.title(f'Betweenness centrality of {model}')
     plt.scatter(range(len(x)), x, 1)
 
     plt.savefig(f'{model}-betweenness.png')
@@ -204,9 +229,9 @@ def analysisgraph(model, nodes, edges, gweight=None):
     df = DataFrame(data)
     df.to_excel(f'{model}-cluster.xlsx')
 
-    plt.xlabel('Citys')
+    plt.xlabel('City')
     plt.ylabel('Clustering coefficient')
-    plt.title(f'Clustering coefficient of {model}')
+    #plt.title(f'Clustering coefficient of {model}')
     plt.scatter(range(len(x)), x, 1)
 
     plt.savefig(f'{model}-cluster.png')
@@ -230,19 +255,18 @@ def main():
     nodes = set(ds_gtw) | set(gs_gtw) | set(ds_xc) | set(gs_xc)
     print(f"无向{len(allpaths)}条, 聚合后城市有{len(nodes)}个")
     # print(nodes)
-    '''
 
     # 简单无向图模型
     print('------简单无向图----------------------------')
-    analysisgraph('undirected graph', nodes, UDEdges)
+    analysisgraph('undirected-graph', nodes, UDEdges)
 
     # 重边权重图模型
     print('------重边权重图----------------------------')
-    analysisgraph('CB-weighted graph', nodes, CBEdges, gweight='no')
+    analysisgraph('CB-weighted-graph', nodes, CBEdges, gweight='no')
 
     # 时间权重图模型
     print('------时间权重图----------------------------')
-    analysisgraph('time-weighted graph', nodes, CBEdges, gweight='time')
+    analysisgraph('time-weighted-graph', nodes, TimeEdges, gweight='time')
 
     '''
     G = nx.Graph()
@@ -259,19 +283,9 @@ def main():
     y = [deg[x] for x in deg]
     print(degv)
 
-    data = np.array(degv)  # data can be list or numpy array
-    results = powerlaw.Fit(data)
-    print(results.power_law.alpha)
-    print(results.power_law.xmin)
-    R, p = results.distribution_compare('power_law', 'lognormal')
+    
 
-    data = np.array(y)  # data can be list or numpy array
-    results = powerlaw.Fit(data)
-    print(results.power_law.alpha)
-    print(results.power_law.xmin)
-    R, p = results.distribution_compare('power_law', 'lognormal')
-
-    '''
+    
     maxdeg = max(degv)
     result = list(range(maxdeg + 1))
     print(len(result))
